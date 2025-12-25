@@ -2,192 +2,146 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>Family Memory Museum</title>
+    <title>我们的时光博物馆 | 云端同步版</title>
+    <script src="//cdn.jsdelivr.net/npm/leancloud-storage@4.12.0/dist/av-min.js"></script>
     <style>
-        :root {
-            --accent: #ff7e5f;
-            --bg: #0a0a0c;
-            --card-bg: rgba(255, 255, 255, 0.05);
-            --border: rgba(255, 255, 255, 0.1);
-        }
-
-        body {
-            background: var(--bg);
-            background-image: linear-gradient(135deg, #0a0a0c 0%, #1a1a2e 100%);
-            color: white;
-            font-family: 'PingFang SC', sans-serif;
-            margin: 0;
-            min-height: 100vh;
-        }
-
-        /* 顶部装饰光线条 */
-        body::before {
-            content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 2px;
-            background: linear-gradient(90deg, transparent, var(--accent), transparent);
-            z-index: 1000;
-        }
-
-        header {
-            padding: 40px 20px;
-            text-align: center;
-            background: rgba(0,0,0,0.3);
-            backdrop-filter: blur(20px);
-            position: sticky; top: 0; z-index: 100;
-        }
-
-        h1 { font-weight: 200; letter-spacing: 8px; font-size: 22px; margin-bottom: 30px; color: #eee; }
-
-        /* 头像区域 - 带有发光呼吸效果 */
-        .avatar-bar {
-            display: flex; justify-content: center; gap: 20px;
-        }
-
-        .person { cursor: pointer; transition: 0.4s; position: relative; width: 70px; }
+        :root { --accent: #ff7e5f; --bg: #0f1012; --glass: rgba(255, 255, 255, 0.08); }
+        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; padding-bottom: 100px; }
         
-        .img-circle {
-            width: 60px; height: 60px; border-radius: 50%;
-            border: 2px solid var(--border); overflow: hidden;
-            margin: 0 auto 10px; transition: 0.4s;
-            background: #222; /* 防止图片没加载时全黑 */
+        /* 1. 倒计时挂件：置顶醒目 */
+        .countdown-timer {
+            background: linear-gradient(90deg, #ff7e5f, #feb47b);
+            padding: 12px; text-align: center; font-size: 14px; font-weight: bold;
+            position: sticky; top: 0; z-index: 1000; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
-        .img-circle img { width: 100%; height: 100%; object-fit: cover; }
+        /* 2. 导航栏 */
+        header { padding: 30px 10px; text-align: center; background: rgba(0,0,0,0.4); backdrop-filter: blur(10px); }
+        .avatar-bar { display: flex; justify-content: center; gap: 15px; overflow-x: auto; padding: 10px; }
+        .person-btn { cursor: pointer; text-align: center; min-width: 65px; opacity: 0.6; transition: 0.3s; }
+        .person-btn.active { opacity: 1; transform: scale(1.1); }
+        .img-box { width: 55px; height: 55px; border-radius: 50%; border: 2px solid transparent; overflow: hidden; margin: 0 auto 5px; background: #333; }
+        .person-btn.active .img-box { border-color: var(--accent); box-shadow: 0 0 15px var(--accent); }
+        .img-box img { width: 100%; height: 100%; object-fit: cover; }
+        .person-btn span { font-size: 12px; display: block; margin-top: 5px; }
 
-        .person span { font-size: 12px; color: #888; display: block; }
-
-        /* 选中状态 */
-        .person.active .img-circle {
-            border-color: var(--accent);
-            box-shadow: 0 0 20px rgba(255, 126, 95, 0.4);
-            transform: translateY(-5px);
-        }
-        .person.active span { color: var(--accent); font-weight: bold; }
-
-        /* 内容瀑布流 */
-        .gallery {
-            padding: 30px;
-            column-count: 2; column-gap: 20px;
-            max-width: 1000px; margin: 0 auto;
-        }
-        @media (min-width: 768px) { .gallery { column-count: 3; } }
-
-        .card {
-            break-inside: avoid; margin-bottom: 20px;
-            background: var(--card-bg); border: 1px solid var(--border);
-            border-radius: 15px; overflow: hidden;
-            backdrop-filter: blur(10px);
-            animation: fadeIn 0.6s ease forwards;
-        }
-
+        /* 3. 照片墙 */
+        .container { padding: 20px; columns: 2; column-gap: 20px; max-width: 1000px; margin: 0 auto; }
+        @media (min-width: 768px) { .container { columns: 3; } }
+        
+        .card { break-inside: avoid; margin-bottom: 20px; background: var(--glass); border-radius: 15px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s; }
+        .card:hover { transform: translateY(-5px); }
         .card img, .card video { width: 100%; display: block; }
         
-        .card-meta {
-            padding: 12px; font-size: 11px; color: #666;
-            display: flex; justify-content: space-between;
-        }
+        /* 4. 点赞互动区 */
+        .card-footer { padding: 12px; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); }
+        .like-btn { cursor: pointer; display: flex; align-items: center; gap: 5px; color: #ff7e5f; font-size: 14px; transition: 0.2s; }
+        .like-btn:active { transform: scale(1.3); }
+        .time-label { font-size: 10px; color: #777; }
 
-        .btn-del { color: #cc4444; cursor: pointer; }
-
-        /* 上传按钮 */
-        .upload-btn {
-            position: fixed; bottom: 40px; right: 40px;
-            width: 60px; height: 60px; border-radius: 50%;
-            background: var(--accent); color: white;
-            font-size: 30px; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; box-shadow: 0 10px 30px rgba(255, 126, 95, 0.3);
-            transition: 0.3s;
-        }
-        .upload-btn:hover { transform: scale(1.1) rotate(90deg); }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        /* 5. 悬浮按钮 */
+        .add-btn { position: fixed; bottom: 30px; right: 25px; width: 60px; height: 60px; border-radius: 50%; background: var(--accent); color: white; font-size: 35px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 10px 25px rgba(255,126,95,0.4); z-index: 1001; }
     </style>
 </head>
 <body>
 
+<div class="countdown-timer" id="days-count">正在计算团圆倒计时...</div>
+
 <header>
-    <h1>OUR LEGACY</h1>
     <div class="avatar-bar">
-        <div class="person active" onclick="sel('all', this)">
-            <div class="img-circle" style="display:flex;align-items:center;justify-content:center;background:#333">∞</div>
-            <span>全部</span>
-        </div>
-        <div class="person" onclick="sel('me', this)">
-            <div class="img-circle"><img src="me.jpg" onerror="this.src='https://via.placeholder.com/60/222/fff?text=ME'"></div>
-            <span>我</span>
-        </div>
-        <div class="person" onclick="sel('baba', this)">
-            <div class="img-circle"><img src="baba.jpg" onerror="this.src='https://via.placeholder.com/60/222/fff?text=Dad'"></div>
-            <span>爸爸</span>
-        </div>
-        <div class="person" onclick="sel('mama', this)">
-            <div class="img-circle"><img src="mama.jpg" onerror="this.src='https://via.placeholder.com/60/222/fff?text=Mom'"></div>
-            <span>妈妈</span>
-        </div>
-        <div class="person" onclick="sel('nainai', this)">
-            <div class="img-circle"><img src="nainai.jpg" onerror="this.src='https://via.placeholder.com/60/222/fff?text=Grandma'"></div>
-            <span>奶奶</span>
-        </div>
-        <div class="person" onclick="sel('didi', this)">
-            <div class="img-circle"><img src="didi.jpg" onerror="this.src='https://via.placeholder.com/60/222/fff?text=Bro'"></div>
-            <span>弟弟</span>
-        </div>
+        <div class="person-btn active" onclick="filter('all', this)"><div class="img-box" style="line-height:55px; font-size:20px;">All</div><span>全部</span></div>
+        <div class="person-btn" onclick="filter('me', this)"><div class="img-box"><img src="https://i.postimg.cc/L5n73pW2/1000045359.jpg"></div><span>我</span></div>
+        <div class="person-btn" onclick="filter('dad', this)"><div class="img-box"><img src="https://i.postimg.cc/3Rx2D6D0/1000045357.jpg"></div><span>爸爸</span></div>
+        <div class="person-btn" onclick="filter('mom', this)"><div class="img-box"><img src="https://i.postimg.cc/xT0fXQzD/1000045356.jpg"></div><span>妈妈</span></div>
+        <div class="person-btn" onclick="filter('grandma', this)"><div class="img-box"><img src="https://i.postimg.cc/mD3fN6K7/1000045358.jpg"></div><span>奶奶</span></div>
+        <div class="person-btn" onclick="filter('bro', this)"><div class="img-box"><img src="https://i.postimg.cc/85zM6D6L/1000045355.jpg"></div><span>弟弟</span></div>
     </div>
 </header>
 
-<div class="gallery" id="gallery"></div>
+<div class="container" id="gallery"></div>
 
-<label class="upload-btn" for="u">+</label>
-<input type="file" id="u" hidden accept="image/*,video/*" multiple onchange="handle(this)">
+<div class="add-btn" id="upload-trigger">+</div>
+<input type="file" id="u-file" hidden accept="image/*,video/*">
 
 <script>
-    let current = 'all';
+    // --- 1. 初始化云端 ---
+    AV.init({
+        appId: "7xAbBJogqhA92wpkvvx6xitH-gzGzoHsz",
+        appKey: "iFYSQEQ0pYLc9vj3JUc50iKM",
+        serverURL: "https://7xabbjog.lc-cn-n1-shared.com"
+    });
 
-    function sel(p, el) {
-        current = p;
-        document.querySelectorAll('.person').forEach(i => i.classList.remove('active'));
-        el.classList.add('active');
-        render();
+    let currentRole = 'all';
+
+    // --- 2. 倒计时功能 (2026年春节) ---
+    function setTimer() {
+        const target = new Date("2026/02/17 00:00:00").getTime();
+        const now = new Date().getTime();
+        const diff = target - now;
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        document.getElementById('days-count').innerText = `🏮 距离 2026 春节团圆还有 ${days} 天`;
+    }
+    setTimer();
+
+    // --- 3. 上传功能 (自动存入云端) ---
+    document.getElementById('upload-trigger').onclick = () => document.getElementById('u-file').click();
+    document.getElementById('u-file').onchange = async function() {
+        if(!this.files.length) return;
+        const file = this.files[0];
+        const trigger = document.getElementById('upload-trigger');
+        trigger.innerText = "⏳";
+
+        try {
+            const avFile = new AV.File(file.name, file);
+            await avFile.save();
+
+            const Memory = AV.Object.extend('Memory');
+            const m = new Memory();
+            m.set('media', avFile);
+            m.set('type', file.type.includes('video') ? 'v' : 'i');
+            m.set('role', currentRole === 'all' ? 'me' : currentRole);
+            m.set('likes', 0);
+            await m.save();
+            render();
+        } catch(e) { console.error(e); alert("上传失败，请确保LeanCloud已创建Memory表"); }
+        trigger.innerText = "+";
+    };
+
+    // --- 4. 点赞功能 (云端同步) ---
+    async function like(id) {
+        const m = AV.Object.createWithoutData('Memory', id);
+        m.increment('likes', 1);
+        await m.save();
+        render(); // 刷新数据
     }
 
-    function handle(input) {
-        for (let file of input.files) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const data = JSON.parse(localStorage.getItem('fam_db_v5') || '[]');
-                data.unshift({
-                    id: Date.now() + Math.random(),
-                    src: e.target.result,
-                    type: file.type.includes('video') ? 'v' : 'i',
-                    owner: current,
-                    time: new Date().toLocaleDateString()
-                });
-                localStorage.setItem('fam_db_v5', JSON.stringify(data));
-                render();
-            };
-            reader.readAsDataURL(file);
-        }
-    }
-
-    function render() {
-        const gallery = document.getElementById('gallery');
-        const data = JSON.parse(localStorage.getItem('fam_db_v5') || '[]');
-        const filtered = current === 'all' ? data : data.filter(i => i.owner === current);
+    // --- 5. 渲染功能 ---
+    async function render() {
+        const query = new AV.Query('Memory');
+        query.descending('createdAt');
+        if(currentRole !== 'all') query.equalTo('role', currentRole);
         
-        gallery.innerHTML = filtered.map(item => `
-            <div class="card">
-                ${item.type === 'v' ? `<video src="${item.src}" controls></video>` : `<img src="${item.src}">`}
-                <div class="card-meta">
-                    <span>${item.time}</span>
-                    <span class="btn-del" onclick="del(${item.id})">删除</span>
+        const results = await query.find();
+        const g = document.getElementById('gallery');
+        g.innerHTML = results.map(item => {
+            const d = item.attributes;
+            const url = d.media.attributes.url;
+            return `
+                <div class="card">
+                    ${d.type === 'v' ? `<video src="${url}" controls></video>` : `<img src="${url}">`}
+                    <div class="card-footer">
+                        <span class="time-label">${item.createdAt.toLocaleDateString()}</span>
+                        <div class="like-btn" onclick="like('${item.id}')">❤️ <span>${d.likes || 0}</span></div>
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
-    function del(id) {
-        if(!confirm('删除？')) return;
-        let data = JSON.parse(localStorage.getItem('fam_db_v5') || '[]');
-        localStorage.setItem('fam_db_v5', JSON.stringify(data.filter(i => i.id !== id)));
+    function filter(role, el) {
+        currentRole = role;
+        document.querySelectorAll('.person-btn').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
         render();
     }
 
